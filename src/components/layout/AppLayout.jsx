@@ -13,6 +13,7 @@ const titles = {
   "/results":   "Analysis Results",
   "/interview": "AI Interview",
   "/history":   "Resume History",
+  "/practice":  "Premium Interview",
 };
 
 const AppLayout = ({ children }) => {

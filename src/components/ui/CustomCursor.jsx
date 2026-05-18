@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, useMotionValue, useSpring, AnimatePresence } from "framer-motion";
 import { useLocation } from "react-router-dom";
 
 const CustomCursor = () => {
   const location = useLocation();
-  const useNativeCursor = location.pathname === "/interview";
+  const useNativeCursor = false;
+  const [cursorRoot, setCursorRoot] = useState(document.body);
   const [visible,  setVisible]  = useState(false);
   const [clicking, setClicking] = useState(false);
   const [hovering, setHovering] = useState(false);
@@ -24,24 +26,12 @@ const CustomCursor = () => {
   }[location.pathname] || 'default';
 
   useEffect(() => {
-    if (typeof document === "undefined") return undefined;
-
-    const previousBodyCursor = document.body.style.cursor;
-    const previousHtmlCursor = document.documentElement.style.cursor;
-
-    if (useNativeCursor) {
-      document.body.style.cursor = "auto";
-      document.documentElement.style.cursor = "auto";
-    } else {
-      document.body.style.cursor = "none";
-      document.documentElement.style.cursor = "";
-    }
-
-    return () => {
-      document.body.style.cursor = previousBodyCursor;
-      document.documentElement.style.cursor = previousHtmlCursor;
+    const onFullscreenChange = () => {
+      setCursorRoot(document.fullscreenElement || document.body);
     };
-  }, [useNativeCursor]);
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
 
   /* Dot — tight spring, follows instantly */
   const dotX = useSpring(mouseX, { stiffness: 600, damping: 35, mass: 0.3 });
@@ -160,7 +150,7 @@ const CustomCursor = () => {
 
   const theme = getPageTheme();
 
-  return (
+  return createPortal(
     <>
       {/* ── Trail particles for special pages ── */}
       {isSpecialPage && (
@@ -341,7 +331,7 @@ const CustomCursor = () => {
         </AnimatePresence>
       )}
     </>
-  );
+  , cursorRoot);
 };
 
 export default CustomCursor;

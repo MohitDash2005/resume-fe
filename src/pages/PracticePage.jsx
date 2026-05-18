@@ -1,13 +1,15 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Bot, User, RotateCcw, Mic, MicOff, Clock, Video, VideoOff, Loader2, Square, Maximize, Minimize } from "lucide-react";
+import { Send, Bot, User, RotateCcw, Mic, MicOff, Clock, Video, VideoOff, Loader2, Square, Maximize, Minimize, Building2, Crown, Lock } from "lucide-react";
 import Badge from "../components/ui/Badge";
-import SetupWizard from "../components/interview/SetupWizard";
+import Button from "../components/ui/Button";
+import PracticeSetupWizard from "../components/interview/PracticeSetupWizard";
 import EnvironmentCheck from "../components/interview/EnvironmentCheck";
 import VideoPanel from "../components/interview/VideoPanel";
 import LiveScoreHUD from "../components/interview/LiveScoreHUD";
 import SubtitleBar from "../components/interview/SubtitleBar";
 import ScoreReport from "../components/interview/ScoreReport";
+import { useApp } from "../context/AppContext";
 import { useSpeech } from "../hooks/useSpeech";
 import { useScoring } from "../hooks/useScoring";
 import {
@@ -19,6 +21,81 @@ import {
 import { getFollowUp } from "../data/questions";
 
 const REACTIONS = ["+1", "Tip", "Aim", "Star", "Hot"];
+
+const PremiumGate = () => (
+  <div className="h-full flex items-center justify-center p-4">
+    <div
+      className="w-full max-w-3xl rounded-3xl p-8 md:p-10"
+      style={{
+        background: "linear-gradient(135deg, rgba(17,24,39,0.96), rgba(8,8,18,0.98))",
+        border: "1px solid rgba(236,72,153,0.18)",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+      }}
+    >
+      <div className="flex flex-col md:flex-row md:items-start gap-8">
+        <div className="flex-1">
+          <div
+            className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5"
+            style={{ background: "rgba(236,72,153,0.14)", border: "1px solid rgba(236,72,153,0.24)" }}
+          >
+            <Crown size={26} className="text-pink-400" />
+          </div>
+          <Badge label="Premium Only" variant="amber" />
+          <h1 className="text-3xl font-black text-white mt-4">Premium Interview</h1>
+          <p className="text-slate-400 mt-3 leading-relaxed max-w-xl">
+            Practice company-specific interviews with the same live experience as the main interview page:
+            webcam, speech-to-text, adaptive scoring, timers, and full reports.
+          </p>
+
+          <div className="grid sm:grid-cols-3 gap-3 mt-6">
+            {[
+              { icon: Building2, title: "Top Companies", text: "Amazon, Google, Microsoft, Meta and more." },
+              { icon: Bot, title: "Live Coaching", text: "Real interview flow with scoring and follow-ups." },
+              { icon: Lock, title: "Premium Access", text: "Unlock this mode with a premium plan." },
+            ].map(({ icon: Icon, title, text }) => (
+              <div
+                key={title}
+                className="rounded-2xl p-4"
+                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+              >
+                <Icon size={16} className="text-pink-400 mb-2" />
+                <p className="text-sm font-bold text-white">{title}</p>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">{text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div
+          className="w-full md:w-80 rounded-2xl p-5"
+          style={{ background: "rgba(236,72,153,0.08)", border: "1px solid rgba(236,72,153,0.16)" }}
+        >
+          <p className="text-sm font-bold text-white">Upgrade required</p>
+          <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+            Your account does not have premium access yet. Once premium is enabled, this page opens the full interview setup immediately.
+          </p>
+          <div className="space-y-2 mt-5">
+            <div className="flex items-center gap-2 text-xs text-slate-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-pink-400" />
+              Company-specific question pools
+            </div>
+            <div className="flex items-center gap-2 text-xs text-slate-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-pink-400" />
+              Live interview environment
+            </div>
+            <div className="flex items-center gap-2 text-xs text-slate-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-pink-400" />
+              Detailed performance report
+            </div>
+          </div>
+          <Button variant="outline" className="w-full mt-6">
+            Contact Admin To Upgrade
+          </Button>
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
 const isNonAnswer = (answer = "") => {
   const lower = String(answer).toLowerCase().trim();
@@ -240,7 +317,7 @@ const MessageBubble = ({ msg, onReact, showFeedback }) => {
         <div className={`flex items-center gap-2 px-1 ${isUser ? "flex-row-reverse" : ""}`}>
           <span className="text-[10px] text-slate-700">{formatTime(msg.timestamp)}</span>
           {msg.reaction && <span className="text-sm">{msg.reaction}</span>}
-
+          {msg.wordCount && isUser && <span className="text-[10px] text-slate-700">{msg.wordCount}w</span>}
         </div>
       </div>
     </motion.div>
@@ -269,7 +346,8 @@ const ConfidenceMeter = ({ score }) => {
   );
 };
 
-const InterviewPage = () => {
+const PracticePage = () => {
+  const { user } = useApp();
   const [screen, setScreen] = useState("setup");
   const [pendingConfig, setPendingConfig] = useState(null);
   const [config, setConfig] = useState(null);
@@ -467,19 +545,23 @@ const InterviewPage = () => {
   }, [config, speak, addMessage]);
 
   const fetchQuestion = useCallback(async (cfg, prevQuestions, conversationHistory, lastQuestion, lastAnswer) => {
+    const seededPool = Array.isArray(cfg?.questionPool) ? cfg.questionPool : [];
+    const nextSeeded = seededPool.find((question) => !prevQuestions.includes(question));
+    if (nextSeeded) return nextSeeded;
+
     try {
       const { question } = await getInterviewQuestion({
-        track: cfg.track,
+        track: `${cfg.track} Company Interview`,
         difficulty: cfg.difficulty,
         previousQuestions: prevQuestions,
         conversationHistory,
         lastQuestion: lastQuestion || null,
         lastAnswer: lastAnswer || null,
-        resumeContext: cfg.resumeContext || null,
+        resumeContext: cfg.resumeContext || `Company: ${cfg.companyName || cfg.track}. Role Focus: ${cfg.companyRole || "Interview practice"}. Ask interview questions aligned with this company.`,
       });
       return question;
     } catch {
-      return getFallbackQuestion(cfg, prevQuestions);
+      return nextSeeded || getFallbackQuestion(cfg, prevQuestions, lastAnswer);
     }
   }, []);
 
@@ -510,13 +592,13 @@ const InterviewPage = () => {
     setTabWarning("");
 
     try {
-      const { sessionId: sid } = await createInterviewSession({ track: cfg.track, difficulty: cfg.difficulty });
+      const { sessionId: sid } = await createInterviewSession({ track: `Premium Interview - ${cfg.track}`, difficulty: cfg.difficulty });
       setSessionId(sid);
     } catch {
       setSessionId(null);
     }
 
-    await aiSay(`Welcome! I'm your AI interviewer for today's ${cfg.track} - ${cfg.difficulty} session.\n\nI'll ask you ${cfg.qCount} questions tailored to your answers. Let's begin!`);
+    await aiSay(`Welcome to your Premium Interview for ${cfg.track}.\n\nWe'll run a ${cfg.difficulty} company-focused session with ${cfg.qCount} questions. Let's begin.`);
     await new Promise((resolve) => setTimeout(resolve, 400));
     setQTimer(0);
 
@@ -550,7 +632,7 @@ const InterviewPage = () => {
     const reportData = {
       overallScore: overall,
       grade,
-      track: config?.track,
+      track: `Premium Interview - ${config?.track}`,
       difficulty: config?.difficulty,
       duration: elapsed,
       answers: allAnswers,
@@ -599,6 +681,7 @@ const InterviewPage = () => {
         content: cleanText,
         timestamp: new Date(),
         id: userMessageId,
+        wordCount,
         scorePending: !!config?.showFeedback,
         scoreData: null,
       },
@@ -813,7 +896,11 @@ const InterviewPage = () => {
       <AnimatePresence mode="wait">
         {screen === "setup" && (
           <motion.div key="setup" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 card overflow-y-auto">
-            <SetupWizard onStart={handleSetupDone} />
+            {user?.isPremium || user?.isAdmin ? (
+              <PracticeSetupWizard onStart={handleSetupDone} />
+            ) : (
+              <PremiumGate />
+            )}
           </motion.div>
         )}
 
@@ -856,12 +943,13 @@ const InterviewPage = () => {
                 </div>
                 <div>
                   <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                    AI Interview Coach
+                    Premium Interview Coach
                     <Badge label="Live" variant="green" />
                     {config && <Badge label={config.track} variant="indigo" />}
+                    <Badge label="Premium" variant="amber" />
                   </h2>
                   <p className="text-[11px] text-slate-600">
-                    Q{Math.min(qIndex + 1, config?.qCount || 1)} / {config?.qCount} � {config?.difficulty}
+                    Q{Math.min(qIndex + 1, config?.qCount || 1)} / {config?.qCount} - {config?.difficulty}
                   </p>
                 </div>
               </div>
@@ -934,7 +1022,7 @@ const InterviewPage = () => {
                 <AnimatePresence>
                   {showVideo && (
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
-                      <VideoPanel aiState={aiState} track={config?.track} enabled={showVideo} onFaceConfidence={handleFaceConfidence} />
+                      <VideoPanel aiState={aiState} track={config?.companyName || config?.track} enabled={showVideo} onFaceConfidence={handleFaceConfidence} />
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -1028,7 +1116,11 @@ const InterviewPage = () => {
                     )}
                   </div>
 
-
+                  {input && (
+                    <span className="text-[10px] text-slate-700 flex-shrink-0 tabular-nums">
+                      {input.split(/\s+/).filter(Boolean).length}w
+                    </span>
+                  )}
 
                   <motion.button
                     whileTap={{ scale: 0.9 }}
@@ -1049,7 +1141,8 @@ const InterviewPage = () => {
   );
 };
 
-export default InterviewPage;
+export default PracticePage;
+
 
 
 

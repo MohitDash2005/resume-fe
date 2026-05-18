@@ -1,5 +1,103 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 
+const isSkinPixel = (r, g, b) => (
+  r > 60 &&
+  g > 30 &&
+  b > 15 &&
+  r > g &&
+  r > b &&
+  (r - Math.min(g, b)) > 10 &&
+  Math.abs(r - g) > 5
+);
+
+const findFaceLikeRegions = (pixels, width, height) => {
+  const focusHeight = Math.floor(height * 0.72);
+  const minX = Math.floor(width * 0.08);
+  const maxX = Math.ceil(width * 0.92);
+  const mask = new Uint8Array(width * focusHeight);
+
+  for (let y = 0; y < focusHeight; y++) {
+    for (let x = minX; x < maxX; x++) {
+      const i = (y * width + x) * 4;
+      if (isSkinPixel(pixels[i], pixels[i + 1], pixels[i + 2])) {
+        mask[(y * width) + x] = 1;
+      }
+    }
+  }
+
+  const visited = new Uint8Array(width * focusHeight);
+  const stackX = [];
+  const stackY = [];
+  const components = [];
+
+  for (let y = 0; y < focusHeight; y++) {
+    for (let x = minX; x < maxX; x++) {
+      const startIndex = (y * width) + x;
+      if (!mask[startIndex] || visited[startIndex]) continue;
+
+      let area = 0;
+      let minCx = x;
+      let maxCx = x;
+      let minCy = y;
+      let maxCy = y;
+      let sumX = 0;
+      let sumY = 0;
+
+      stackX.push(x);
+      stackY.push(y);
+      visited[startIndex] = 1;
+
+      while (stackX.length) {
+        const cx = stackX.pop();
+        const cy = stackY.pop();
+
+        area++;
+        sumX += cx;
+        sumY += cy;
+        if (cx < minCx) minCx = cx;
+        if (cx > maxCx) maxCx = cx;
+        if (cy < minCy) minCy = cy;
+        if (cy > maxCy) maxCy = cy;
+
+        for (let ny = Math.max(0, cy - 1); ny <= Math.min(focusHeight - 1, cy + 1); ny++) {
+          for (let nx = Math.max(minX, cx - 1); nx <= Math.min(maxX - 1, cx + 1); nx++) {
+            const nextIndex = (ny * width) + nx;
+            if (!visited[nextIndex] && mask[nextIndex]) {
+              visited[nextIndex] = 1;
+              stackX.push(nx);
+              stackY.push(ny);
+            }
+          }
+        }
+      }
+
+      const boxWidth = maxCx - minCx + 1;
+      const boxHeight = maxCy - minCy + 1;
+      const fillRatio = area / (boxWidth * boxHeight);
+      const aspectRatio = boxWidth / boxHeight;
+      const centerX = sumX / area;
+      const centerY = sumY / area;
+
+      const looksFaceLike =
+        area >= 170 &&
+        boxWidth >= 18 &&
+        boxHeight >= 22 &&
+        boxWidth <= width * 0.62 &&
+        boxHeight <= focusHeight * 0.85 &&
+        aspectRatio >= 0.38 &&
+        aspectRatio <= 1.75 &&
+        fillRatio >= 0.16 &&
+        centerY <= focusHeight * 0.78;
+
+      if (looksFaceLike) {
+        components.push({ area, centerX, centerY, boxWidth, boxHeight });
+      }
+    }
+  }
+
+  return components.sort((a, b) => b.area - a.area);
+};
+
 export const useWebcam = () => {
   const [stream,        setStream]        = useState(null);
   const [enabled,       setEnabled]       = useState(false);
@@ -17,8 +115,9 @@ export const useWebcam = () => {
   const frameCount  = useRef(0);
 
   // Rolling history for stable confidence score
-  const eyeHistory  = useRef([]);   // last 30 frames: 1=eye contact, 0=not
-  const faceHistory = useRef([]);   // last 30 frames: 1=detected, 0=not
+  const eyeHistory   = useRef([]);   // last 30 frames: 1=eye contact, 0=not
+  const faceHistory  = useRef([]);   // last 30 frames: 1=detected, 0=not
+  const multiHistory = useRef([]);   // last 20 frames: 1=multi detected, 0=not
 
   useEffect(() => { streamRef.current = stream; }, [stream]);
 
@@ -43,6 +142,7 @@ export const useWebcam = () => {
       prevData.current = null;
       eyeHistory.current = [];
       faceHistory.current = [];
+      multiHistory.current = [];
       return;
     }
 
@@ -85,32 +185,27 @@ export const useWebcam = () => {
       let skinCount = 0;
       for (let i = 0; i < len; i += 4) {
         const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
-        if (r > 60 && g > 30 && b > 15 && r > g && r > b &&
-            (r - Math.min(g, b)) > 10 && Math.abs(r - g) > 5) skinCount++;
+        if (isSkinPixel(r, g, b)) skinCount++;
       }
       const skinRatio = skinCount / count;
 
       // ── Multi-person detection ──
-      // Divide frame into left and right halves — if both halves have significant
-      // independent skin clusters, likely 2+ people
-      const halfW = Math.floor(W / 2);
-      let leftSkin = 0, rightSkin = 0, halfCount = 0;
-      for (let y = 0; y < H; y++) {
-        for (let x = 0; x < W; x++) {
-          const i = (y * W + x) * 4;
-          const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
-          const isSkin = r > 60 && g > 30 && b > 15 && r > g && r > b &&
-                         (r - Math.min(g, b)) > 10 && Math.abs(r - g) > 5;
-          if (x < halfW) { if (isSkin) leftSkin++; halfCount++; }
-          else { if (isSkin) rightSkin++; }
-        }
-      }
-      const leftRatio  = leftSkin / halfCount;
-      const rightRatio = rightSkin / halfCount;
-      // Both halves have significant skin = likely 2 people side by side
-      const isMulti = leftRatio > 0.06 && rightRatio > 0.06 &&
-                      Math.min(leftRatio, rightRatio) / Math.max(leftRatio, rightRatio) > 0.35;
-      setMultiPerson(isMulti);
+      // Look for separate face-sized skin regions instead of raw skin columns.
+      const faceRegions = findFaceLikeRegions(pixels, W, H);
+      const primaryFace = faceRegions[0];
+      const secondaryFace = faceRegions[1];
+      const secondaryStrongEnough =
+        secondaryFace &&
+        primaryFace &&
+        secondaryFace.area >= primaryFace.area * 0.34 &&
+        Math.abs(secondaryFace.centerX - primaryFace.centerX) >= W * 0.18;
+      const isMulti = Boolean(primaryFace && secondaryStrongEnough);
+
+      // Debounce: require 12 of last 20 frames to confirm
+      multiHistory.current.push(isMulti ? 1 : 0);
+      if (multiHistory.current.length > 20) multiHistory.current.shift();
+      const multiVotes = multiHistory.current.reduce((a, b) => a + b, 0);
+      setMultiPerson(multiVotes >= 12);
 
       // ── Motion ──
       let motion = 0;
@@ -124,7 +219,8 @@ export const useWebcam = () => {
       const goodBrightness = mean > 20 && mean < 240;
       const goodVariance   = variance > 200;
       const hasSkin        = skinRatio > 0.04;
-      const detected       = goodBrightness && (goodVariance || hasSkin);
+      const hasFaceRegion  = faceRegions.length > 0;
+      const detected       = goodBrightness && ((hasFaceRegion && (goodVariance || hasSkin)) || (hasSkin && variance > 140));
       setFaceDetected(detected);
 
       // Update rolling face history (30 frames)
@@ -143,7 +239,7 @@ export const useWebcam = () => {
           const cd = ctx.getImageData(cx, cy, cw, ch).data;
           for (let i = 0; i < cd.length; i += 4) {
             const r = cd[i], g = cd[i + 1], b = cd[i + 2];
-            if (r > 60 && g > 30 && b > 15 && r > g && r > b) centerSkin++;
+            if (isSkinPixel(r, g, b)) centerSkin++;
             centerCount++;
           }
         } catch {}
@@ -182,6 +278,7 @@ export const useWebcam = () => {
       prevData.current = null;
       eyeHistory.current = [];
       faceHistory.current = [];
+      multiHistory.current = [];
 
       const s = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user", frameRate: { ideal: 30 } },
@@ -220,6 +317,7 @@ export const useWebcam = () => {
     prevData.current = null;
     eyeHistory.current = [];
     faceHistory.current = [];
+    multiHistory.current = [];
   }, [stream]);
 
   useEffect(() => () => {

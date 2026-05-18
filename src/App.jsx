@@ -12,6 +12,7 @@ import UploadPage     from "./pages/UploadPage";
 import ResultPage     from "./pages/ResultPage";
 import InterviewPage  from "./pages/InterviewPage";
 import HistoryPage    from "./pages/HistoryPage";
+import PracticePage   from "./pages/PracticePage";
 import OAuthCallback  from "./pages/OAuthCallback";
 import AdminLayout    from "./pages/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -94,6 +95,9 @@ const AppRoutes = () => {
         } />
         <Route path="/history" element={
           <ProtectedRoute><AppLayout><HistoryPage /></AppLayout></ProtectedRoute>
+        } />
+        <Route path="/practice" element={
+          <ProtectedRoute><AppLayout><PracticePage /></AppLayout></ProtectedRoute>
         } />
 
         <Route path="*" element={<Navigate to={user ? "/dashboard" : "/"} replace />} />

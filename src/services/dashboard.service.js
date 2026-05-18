@@ -15,6 +15,7 @@ export const interviewService = {
 export const adminService = {
   stats:           ()         => api.get("/admin/stats").then(r => r.data),
   users:           (p = 1, s) => api.get(`/admin/users?page=${p}&search=${s || ""}`).then(r => r.data),
+  setPremium:      (id, isPremium) => api.put("/auth/premium", { userId: id, isPremium }).then(r => r.data),
   deleteUser:      (id)       => api.delete(`/admin/users/${id}`).then(r => r.data),
   resumes:         (p = 1)    => api.get(`/admin/resumes?page=${p}`).then(r => r.data),
   deleteResume:    (id)       => api.delete(`/admin/resumes/${id}`).then(r => r.data),

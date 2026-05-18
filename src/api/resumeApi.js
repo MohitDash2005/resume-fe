@@ -191,6 +191,7 @@ export const submitFeedback = async ({ rating, category, message }) => {
 
 export const adminSearchSkill    = async (skill)    => { const { data } = await api.get(`/admin/skills/search?skill=${encodeURIComponent(skill)}`); return data; };
 export const adminGetTopSkills   = async ()         => { const { data } = await api.get("/admin/skills/top");               return data; };
+export const adminSetPremium     = async (userId, isPremium) => { const { data } = await api.put("/auth/premium", { userId, isPremium }); return data; };
 
 // ─────────────────────────────────────────────
 // CLIENT-SIDE SCORING (kept for offline/fallback use in useScoring.js)

@@ -1,5 +1,5 @@
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Upload, FileText, MessageSquare, LogOut, Zap, ChevronRight, ShieldCheck, Sparkles, History, MessageCircle } from "lucide-react";
+import { LayoutDashboard, Upload, FileText, MessageSquare, LogOut, Zap, ChevronRight, ShieldCheck, Sparkles, History, MessageCircle, Building2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useApp } from "../../context/AppContext";
 
@@ -9,6 +9,7 @@ const links = [
   { to: "/results",   icon: FileText,         label: "Results",    badge: null,    color: "#10b981" },
   { to: "/interview", icon: MessageSquare,    label: "Interview",  badge: "AI",    color: "#8b5cf6" },
   { to: "/history",   icon: History,          label: "History",    badge: null,    color: "#f59e0b" },
+  { to: "/practice",  icon: Building2,        label: "Premium Interview", badge: "Hot",   color: "#ec4899" },
 ];
 
 const Sidebar = ({ onLogout, onFeedback }) => {
@@ -105,6 +106,8 @@ const Sidebar = ({ onLogout, onFeedback }) => {
                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md
                       ${badge === "New"
                         ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
+                        : badge === "Hot"
+                        ? "bg-pink-500/15 text-pink-400 border border-pink-500/20"
                         : "bg-violet-500/15 text-violet-400 border border-violet-500/20"}`}>
                       {badge}
                     </span>

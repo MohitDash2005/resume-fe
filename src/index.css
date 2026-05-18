@@ -476,3 +476,22 @@
   0%   { transform: translateY(-100%) }
   100% { transform: translateY(100vh) }
 }
+
+/* ═══════════════════════════════════════════════
+   FULLSCREEN CURSOR FIX
+   Custom cursor elements use fixed positioning
+   which is clipped by the fullscreen element.
+   Re-attach them as children of :fullscreen so
+   they remain visible during interview sessions.
+═══════════════════════════════════════════════ */
+:fullscreen,
+:-webkit-full-screen,
+:-moz-full-screen {
+  cursor: none !important;
+}
+
+:fullscreen *,
+:-webkit-full-screen *,
+:-moz-full-screen * {
+  cursor: none !important;
+}

@@ -116,6 +116,7 @@ const VideoPanel = ({ aiState = "idle", track, enabled, onFaceConfidence }) => {
   const [expanded,     setExpanded]     = useState(false); // fullscreen modal
   const noFaceTimer = useRef(null);
   const noEyeTimer  = useRef(null);
+  const fullscreenVideoRef = useRef(null);
 
   useEffect(() => {
     if (!camOn || !stream) { setStableNoFace(false); setStableNoEye(false); return; }
@@ -151,6 +152,19 @@ const VideoPanel = ({ aiState = "idle", track, enabled, onFaceConfidence }) => {
   useEffect(() => {
     if (onFaceConfidence) onFaceConfidence(faceConfidence);
   }, [faceConfidence, onFaceConfidence]);
+
+  useEffect(() => {
+    const fullscreenVideo = fullscreenVideoRef.current;
+    if (!fullscreenVideo) return;
+
+    if (expanded && camOn && stream) {
+      fullscreenVideo.srcObject = stream;
+      fullscreenVideo.play().catch(() => {});
+      return;
+    }
+
+    fullscreenVideo.srcObject = null;
+  }, [expanded, camOn, stream]);
 
   const CameraView = ({ fullscreen = false }) => (
     <div className={`relative rounded-2xl overflow-hidden ${fullscreen ? "w-full h-full" : "w-full aspect-video"}`}
@@ -336,7 +350,7 @@ const VideoPanel = ({ aiState = "idle", track, enabled, onFaceConfidence }) => {
               onClick={e => e.stopPropagation()}>
 
               <video autoPlay muted playsInline
-                ref={el => { if (el && stream) { el.srcObject = stream; el.play().catch(() => {}); } }}
+                ref={fullscreenVideoRef}
                 className="w-full h-full object-cover scale-x-[-1]"
                 style={{ display: camOn && stream ? "block" : "none" }} />
 
