@@ -347,7 +347,7 @@ const LandingPage = () => {
             <span className="text-emerald-400">Analyzer</span>
           </span>
         </div>
-        <p className="text-slate-700 text-xs">© 2025 Smart Resume Analyzer · Built with ❤️</p>
+        <p className="text-slate-700 text-xs">© 2025 Resume2Hire · Built with ❤️</p>
       </footer>
       </AnimatedBackground>
     </div>

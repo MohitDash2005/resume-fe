@@ -77,7 +77,7 @@ const LoginPage = () => {
                     <Sparkles size={20} className="text-white" />
                   </div>
                   <div>
-                    <p className="font-extrabold text-white text-base leading-tight">Smart Resume Analyzer</p>
+                    <p className="font-extrabold text-white text-base leading-tight">Resume2Hire</p>
                     <p className="text-[10px] text-cyan-400 font-bold tracking-widest uppercase">AI Career Platform</p>
                   </div>
                 </div>

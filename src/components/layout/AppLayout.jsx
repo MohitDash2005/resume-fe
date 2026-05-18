@@ -57,7 +57,7 @@ const AppLayout = ({ children }) => {
 
       <div className="flex-1 md:ml-60 flex flex-col min-h-screen" style={{ position: "relative", zIndex: 1 }}>
         <Navbar
-          title={titles[pathname] || "Smart Resume Analyzer"}
+          title={titles[pathname] || "Resume2Hire"}
           user={user}
           onMenuClick={() => setMobileOpen(o => !o)}
         />
